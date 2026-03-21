@@ -1,0 +1,1 @@
+const CONFIG_MAPBOX_TOKEN = 'pk.eyJ1IjoiYW50b25pb2lyYW5lIiwiYSI6ImNtbXpsdnJzZjA5bXQycnB3bTZnN256OTcifQ.XHCq9FVuKZ2kWyazFD0p_w';
