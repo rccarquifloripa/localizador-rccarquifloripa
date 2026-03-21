@@ -861,12 +861,19 @@
             {nome:"NOSSA SENHORA DE FATIMA",endereco:"RUA SOUZA DUTRA, 442 - CEP 88070-605",lat:-27.587777777777777,lon:-48.58027777777778,reuniao:"SEGUNDA-FEIRA / 19H30",coordenador:"ROSÉLIA RIBEIRO DA SILA",telefone:"5548988664427",forania:"CONTINENTE",paroquia:"SANTUÁRIO NOSSA SENHORA DE FÁTIMA",cidade:"FLORIANÓPOLIS"},
             {nome:"NOSSA SENHORA DO CARMO",endereco:"RUA PROFESSOR BAYER FILHO, 49 - CEP 88080-300",lat:-27.608611111111113,lon:-48.57916666666667,reuniao:"QUARTA-FEIRA / 19H30",coordenador:"JUCIANA FERNANDES DA SILVA ASCENSO",telefone:"5548999145457",forania:"CONTINENTE",paroquia:"NOSSA SENHORA DO CARMO",cidade:"FLORIANÓPOLIS"},
             {nome:"SÂO JOÃO BATISTA E SANTA LUZIA",endereco:"RUA ISAURA COMICHOLE PÍRES, 102 - CEP  88090-130",lat:-27.591944444444444,lon:-48.58277777777778,reuniao:"SEGUNDA-FEIRA / 15H",coordenador:"TEREZINHA DE JESUS ALTHOFF WAGNER",telefone:"5548999285998",forania:"CONTINENTE",paroquia:"RAÍZES DO ESPÍRITO",cidade:"FLORIANÓPOLIS"},
-            {nome:"SÃO JOSÉ E SANTA RITA DE CASSIA",endereco:"RUA LUÍS D\'ACÂMPORA, 207 - CEP 88095-330",lat:-27.578611111111112,lon:-48.595,reuniao:"QUINTA-FEIRA / 19H30",coordenador:"NAMARA ARAUJO SILVA",telefone:"5548996062011",forania:"CONTINENTE",paroquia:"SÃO JOSÉ E SANTA RITA DE CÁSSIA",cidade:"FLORIANÓPOLIS"}
+          {nome:"SÃO JOSÉ E SANTA RITA DE CASSIA",endereco:"RUA LUÍS D\'ACÂMPORA, 207 - CEP 88095-330",lat:-27.578611111111112,lon:-48.595,reuniao:"QUINTA-FEIRA / 19H30",coordenador:"NAMARA ARAUJO SILVA",telefone:"5548996062011",forania:"CONTINENTE",paroquia:"SÃO JOSÉ E SANTA RITA DE CÁSSIA",cidade:"FLORIANÓPOLIS"}
         ];
-        
+    </script> 
+
+    <script src="config.js"></script>
+
+    <script>
         let userLocation = null;
         let preferJovem = false;
         let semNumero = false;
+
+        // Tenta usar o arquivo externo. Se o seu computador bloquear, usa a chave direto para não quebrar.
+        const MAPBOX_TOKEN = typeof CONFIG_MAPBOX_TOKEN !== 'undefined' ? CONFIG_MAPBOX_TOKEN : 'pk.eyJ1IjoiYW50b25pb2lyYW5lIiwiYSI6ImNtbXpsdnJzZjA5bXQycnB3bTZnN256OTcifQ.XHCq9FVuKZ2kWyazFD0p_w';  
         
         // Formatação de CEP
         document.getElementById('cep').addEventListener('input', function(e) {
@@ -924,36 +931,53 @@
                     btn.style.borderColor = 'var(--success-color)';
                     btn.disabled = false;
 
-                    try {
-                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLocation.lat}&lon=${userLocation.lon}`);
-                        const data = await response.json();
+try {
+                        // 1. Busca o endereço completo e preciso usando Mapbox
+                        const mapboxRes = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lon},${userLocation.lat}.json?access_token=${MAPBOX_TOKEN}&language=pt&country=br`);
+                        const mapboxData = await mapboxRes.json();
                         
-                        if (data && data.address) {
-                            const road = data.address.road || '';
-                            const suburb = data.address.suburb || data.address.neighbourhood || '';
-                            const city = data.address.city || data.address.town || data.address.village || '';
-                            const state = data.address.state || '';
-                            const postcode = data.address.postcode || '';
+                        let cepEncontrado = '';
+
+                        if (mapboxData.features && mapboxData.features.length > 0) {
+                            const place = mapboxData.features[0];
                             
-                            let addressText = road;
-                            if(suburb) addressText += (addressText ? `, ${suburb}` : suburb);
-                            if(city && state) addressText += (addressText ? ` - ${city}/${state}` : `${city}/${state}`);
-                            else if (city) addressText += (addressText ? ` - ${city}` : city);
+                            // Preenche o endereço com a qualidade superior do Mapbox
+                            document.getElementById('endereco').value = place.place_name || 'Localização obtida via GPS';
                             
-                            document.getElementById('endereco').value = addressText || 'Localização obtida via GPS';
-                            
-                            if (postcode) {
-                                let formattedCep = postcode.replace(/\D/g, '');
-                                if (formattedCep.length === 8) {
-                                    formattedCep = formattedCep.replace(/(\d{5})(\d{3})/, '$1-$2');
-                                    document.getElementById('cep').value = formattedCep;
-                                } else {
-                                    document.getElementById('cep').value = postcode;
-                                }
+                            // Tenta pegar o CEP do Mapbox
+                            const postcodeContext = (place.context || []).find(c => c.id.startsWith('postcode'));
+                            if (postcodeContext) {
+                                cepEncontrado = postcodeContext.text.replace(/\D/g, '');
                             }
                         } else {
                             document.getElementById('endereco').value = 'Localização obtida via GPS';
                         }
+
+                        // 2. Se o Mapbox não trouxer o CEP completo (8 dígitos), usamos o OpenStreetMap como "estepe" apenas para buscar o CEP
+                        if (cepEncontrado.length !== 8) {
+                            try {
+                                const fallbackRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLocation.lat}&lon=${userLocation.lon}`);
+                                const fallbackData = await fallbackRes.json();
+                                
+                                if (fallbackData && fallbackData.address && fallbackData.address.postcode) {
+                                    const cepFallback = fallbackData.address.postcode.replace(/\D/g, '');
+                                    // Se o estepe encontrou os 8 dígitos, substituímos
+                                    if (cepFallback.length === 8) {
+                                        cepEncontrado = cepFallback;
+                                    }
+                                }
+                            } catch (err) {
+                                console.warn('Fallback de CEP falhou', err);
+                            }
+                        }
+
+                        // 3. Preenche e formata o campo CEP corretamente na tela
+                        if (cepEncontrado.length === 8) {
+                            document.getElementById('cep').value = cepEncontrado.replace(/(\d{5})(\d{3})/, '$1-$2');
+                        } else if (cepEncontrado) {
+                            document.getElementById('cep').value = cepEncontrado;
+                        }
+
                     } catch(e) {
                         document.getElementById('endereco').value = 'Localização obtida via GPS';
                     }
@@ -997,26 +1021,36 @@
                 return;
             }
 
-            debounceTimer = setTimeout(async () => {
+debounceTimer = setTimeout(async () => {
                 try {
-                    const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + ', Brasil')}&limit=5`);
+                    // Usando o Photon (OpenStreetMap) apenas para as sugestões de digitação,
+                    // pois o algoritmo dele é muito superior ao Mapbox para ruas numeradas no Brasil!
+                    const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + ', Santa Catarina, Brasil')}&limit=5`);
                     const data = await response.json();
                     sugestoesList.innerHTML = '';
 
                     if (data.features && data.features.length > 0) {
                         data.features.forEach(feature => {
                             const props = feature.properties;
+                            // Pega o nome da rua, bairro e cidade
                             const rua = props.name || props.street || '';
+                            const bairro = props.district || props.neighbourhood || '';
                             const cidade = props.city || props.town || props.state || '';
                             
+                            // Se não for uma rua/local válido, ignora
                             if (!rua) return; 
 
-                            const textoSugestao = `${rua}${cidade ? ', ' + cidade : ''}`;
+                            // Monta o texto de sugestão bonitinho: "Rua 143, Meia Praia - Itapema"
+                            let textoSugestao = rua;
+                            if (bairro) textoSugestao += `, ${bairro}`;
+                            if (cidade) textoSugestao += ` - ${cidade}`;
+                            
                             const li = document.createElement('li');
                             li.textContent = textoSugestao;
                             
                             li.addEventListener('click', () => {
                                 enderecoInput.value = textoSugestao;
+                                // O Photon também retorna coordenadas no formato [longitude, latitude]
                                 userLocation = {
                                     lat: feature.geometry.coordinates[1],
                                     lon: feature.geometry.coordinates[0]
@@ -1035,7 +1069,7 @@
                 } catch (error) {
                     console.error('Erro ao buscar sugestões:', error);
                 }
-            }, 500); 
+            }, 500);
         });
 
         document.addEventListener('click', function(e) {
@@ -1057,11 +1091,13 @@
                 const data = await response.json();
                 const enderecoInput = document.getElementById('endereco');
                 
-                // Tratamento CEP Genérico
+// Tratamento CEP Genérico (ex: 88220-000 de Itapema)
                 if (!data.street || data.street.trim() === "") {
-                    enderecoInput.value = `Escreva aqui seu Endereço Completo, ${data.city}/${data.state}`;
-                    enderecoInput.focus();
-                    // Busca pelo menos o centro da cidade para não travar
+                    enderecoInput.value = ''; // Limpa o campo para o usuário não ter que apagar texto
+                    enderecoInput.placeholder = `Você está em ${data.city}. Digite o nome da rua...`; // Dá a dica visual
+                    enderecoInput.focus(); // Puxa o cursor para a pessoa já sair digitando
+                    
+                    // Centraliza as coordenadas na cidade provisoriamente para não travar o sistema
                     await obterCoordenadasPorTexto(`${data.city}, ${data.state}, Brasil`);
                 } else {
                     enderecoInput.value = `${data.street}, ${data.neighborhood} - ${data.city}/${data.state}`;
@@ -1091,11 +1127,10 @@
             }
         }
 
-        // Função Obter Coordenadas com TRIPLA TENTATIVA DE SUCESSO
+// Função Obter Coordenadas usando Mapbox
         async function obterCoordenadasPorTexto(textoPrincipal, textoCidade = null) {
             try {
-                // TENTATIVA 1: API Photon (Mais tolerante a erros no Brasil)
-                let response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(textoPrincipal)}&limit=1`);
+                let response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(textoPrincipal)}.json?country=br&limit=1&access_token=${MAPBOX_TOKEN}&language=pt`);
                 let data = await response.json();
                 
                 if (data.features && data.features.length > 0) {
@@ -1106,20 +1141,8 @@
                     return;
                 }
                 
-                // TENTATIVA 2: API Nominatim
-                response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(textoPrincipal)}&limit=1`);
-                data = await response.json();
-                if (data.length > 0) {
-                    userLocation = {
-                        lat: parseFloat(data[0].lat),
-                        lon: parseFloat(data[0].lon)
-                    };
-                    return;
-                }
-
-                // TENTATIVA 3 (ULTIMO RECURSO): Busca apenas a cidade para não deixar o usuário travado
                 if (textoCidade) {
-                    response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(textoCidade)}&limit=1`);
+                    response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(textoCidade)}.json?country=br&limit=1&access_token=${MAPBOX_TOKEN}&language=pt`);
                     data = await response.json();
                     if (data.features && data.features.length > 0) {
                         userLocation = {
@@ -1129,7 +1152,7 @@
                     }
                 }
             } catch (error) {
-                console.error('Erro ao obter coordenadas:', error);
+                console.error('Erro ao obter coordenadas com Mapbox:', error);
             }
         }
 
