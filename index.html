@@ -1350,13 +1350,8 @@ debounceTimer = setTimeout(async () => {
             
             const cep = document.getElementById('cep').value.replace(/\D/g, '');
             const numero = document.getElementById('numero').value;
-            const endereco = document.getElementById('endereco').value;
+            const endereco = document.getElementById('endereco').value; // Ex: "Rua Edmundo Otacilio, Kobrasol - São José/SC"
 
-            // Força a busca do CEP caso o usuário clique em buscar muito rápido
-            if (!userLocation && cep.length === 8) {
-                await buscarCEP(cep);
-            }
-            
             // Validações
             if (cep.length !== 8 && !userLocation && endereco.length < 5) {
                 showError('Por favor, digite um CEP válido, busque pelo nome da sua rua ou clique em usar localização.');
@@ -1366,6 +1361,27 @@ debounceTimer = setTimeout(async () => {
             if (!semNumero && !numero.trim() && !endereco.includes('GPS')) {
                 showError('Por favor, digite o número da casa ou marque "Sem número".');
                 return;
+            }
+
+            showLoading(true);
+
+            // CORREÇÃO: Forçar a busca da coordenada EXATA (Rua + Número + Cidade) antes de cruzar os dados
+            if (!endereco.includes('GPS') && endereco.trim() !== '') {
+                let enderecoBusca = endereco;
+                
+                // Se o usuário digitou um número, injetamos ele na string de busca para o Mapbox
+                if (!semNumero && numero.trim()) {
+                    const rua = endereco.split(',')[0]; // Pega só a rua
+                    const cidadeEstado = endereco.split('-')[1] || ''; // Pega a cidade/estado
+                    enderecoBusca = `${rua}, ${numero}, ${cidadeEstado}, Brasil`;
+                }
+                
+                // Sobrescreve o userLocation impreciso da BrasilAPI com a coordenada cravada do Mapbox
+                await obterCoordenadasPorTexto(enderecoBusca);
+                
+            } else if (!userLocation && cep.length === 8) {
+                // Prevenção caso o usuário clique muito rápido
+                await buscarCEP(cep);
             }
             
             buscarGrupos();
