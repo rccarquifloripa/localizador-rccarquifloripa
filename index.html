@@ -628,7 +628,7 @@ body, html { background:#f7f9fc; }
             <div class="contact-list">
                 <div class="contact-item"><i class="fas fa-user"></i> <span id="sheet-coord">Coordenador</span></div>
                 <div class="contact-item"><i class="fas fa-phone-alt"></i> <span id="sheet-tel">Telefone</span></div>
-                <div class="contact-item"><i class="fas fa-church"></i> <span id="sheet-paroquia">Paróquia</span></div>
+                <div class="contact-item"><i class="fas fa-church"></i> <span id="sheet-igreja">Igreja</span></div>
                 <div class="contact-item"><i class="fas fa-map-marker-alt"></i> <span id="sheet-forania">Forania</span></div>
             </div>
 
@@ -834,7 +834,7 @@ body, html { background:#f7f9fc; }
             document.getElementById('sheet-endereco').innerHTML = `${grupo['Endereço'] || ''}<br>${grupo.Cidade || ''}`;
             document.getElementById('sheet-coord').textContent = `Coordenador(a): ${grupo.Coordenador || 'Não informado'}`;
             document.getElementById('sheet-tel').textContent = grupo.Telefone || 'Não informado';
-            document.getElementById('sheet-paroquia').textContent = `Paróquia: ${grupo['Paróquia'] || 'Não informada'}`;
+            document.getElementById('sheet-igreja').textContent = `Paróquia: ${grupo['Igreja'] || 'Não informada'}`;
             document.getElementById('sheet-forania').textContent = `Forania: ${grupo.Forania || 'Não informada'}`;
             document.getElementById('sheet-reuniao').textContent = grupo['Reunião'] || 'Horário a definir';
 
